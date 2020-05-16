@@ -1,4 +1,4 @@
-package githubsnd;
+package cw.github.pharmakon;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -20,8 +20,8 @@ import org.springframework.web.client.RestTemplate;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 
-import githubsnd.Model.Repositories;
-import githubsnd.Model.Repository;
+import cw.github.pharmakon.Model.Repositories;
+import cw.github.pharmakon.Model.Repository;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 

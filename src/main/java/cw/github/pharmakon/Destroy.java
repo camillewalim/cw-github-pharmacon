@@ -1,4 +1,4 @@
-package githubsnd;
+package cw.github.pharmakon;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -28,7 +28,7 @@ import org.eclipse.jgit.treewalk.filter.PathSuffixFilter;
 
 import com.google.common.collect.ImmutableList;
 
-import githubsnd.Search.GitAndRepo;
+import cw.github.pharmakon.Search.GitAndRepo;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 

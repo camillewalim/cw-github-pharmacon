@@ -1,4 +1,4 @@
-package githubsnd;
+package cw.github.pharmakon;
 
 import java.io.Serializable;
 import java.util.HashMap;
