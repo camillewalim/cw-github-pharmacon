@@ -37,6 +37,8 @@ The algorithm will go through six phases :
    
 	   - jdbc : connect & list all databases names, tables, users
 	   - api keys : connect & retrieve a valid token out of a oath store.
+	   - certificate : open it, list aliases and URL.
+	   
  - V: *(optional)* name and shame by sending emails to the owner/team.
  - VI: consolidate a report with all credentials found, by owner and repository, as well 
    as statistics to try to identify some pattern in laziness. 
