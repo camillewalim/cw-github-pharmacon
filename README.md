@@ -60,7 +60,7 @@ the whole history of developments and look for sensitive data that has been dele
 ## What is the risk
 Let's say you are a Fortune 500 company *(for the figures)*. 
 
-The risk is a [DEFCON 1](https://en.wikipedia.org/wiki/DEFCON) attack (2 hours needed) :
+The risk is a [DEFCON 1](https://en.wikipedia.org/wiki/DEFCON) attack (an attack needing only few hours to obliterate a worldwide structure) :
 
  - __6:00 am__ : some hackers get access to your intranet, and start to look for your 
    github enterprise location.
