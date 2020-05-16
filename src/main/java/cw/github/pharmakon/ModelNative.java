@@ -16,7 +16,7 @@ import lombok.Setter;
 
 
 
-public class Model_Native {
+public class ModelNative {
 
 	@JsonInclude(JsonInclude.Include.NON_NULL)
 	@Getter

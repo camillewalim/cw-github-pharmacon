@@ -60,7 +60,7 @@ the whole history of developments and look for sensitive data that has been dele
 ## What is the risk
 Let's say you are a Fortune 500 company *(for the figures)*. 
 
-Here is the risk :
+The risk is a [DEFCON 1](https://en.wikipedia.org/wiki/DEFCON) attack (2 hours needed) :
 
  - __6:00 am__ : some hackers get access to your intranet, and start to look for your 
    github enterprise location.
@@ -75,7 +75,7 @@ Here is the risk :
    have a hundred of valid DB credentials for dev infrastucture and dozen for prod infrastructure.
  - __8:00 am__ : Black Hacking Phase: Your employees arrived at work and discover : 
    DDOS attack on servers with valid oauth secrets, dropped or corrupted or locked DB, 
-   messed dev environments, leaked information, etc. 
+   messed dev environments, leaked information (emails, company data, employee data), etc. 
     
      
 

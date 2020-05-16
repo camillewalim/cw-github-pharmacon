@@ -11,10 +11,10 @@ import java.util.stream.Stream;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.lib.RepositoryBuilder;
 
-import cw.github.pharmakon.Model_Local.GitComputedInfo;
-import cw.github.pharmakon.Model_Local.GitWrap;
-import cw.github.pharmakon.Model_Native.Repositories;
-import cw.github.pharmakon.Model_Native.RepositoryMetaInfo;
+import cw.github.pharmakon.ModelLocal.GitComputedInfo;
+import cw.github.pharmakon.ModelLocal.GitWrap;
+import cw.github.pharmakon.ModelNative.Repositories;
+import cw.github.pharmakon.ModelNative.RepositoryMetaInfo;
 import lombok.AllArgsConstructor;
 
 /**

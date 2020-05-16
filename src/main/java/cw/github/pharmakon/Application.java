@@ -10,20 +10,22 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
-import cw.github.pharmakon.Model_Local.Credential;
-import cw.github.pharmakon.Model_Local.Failure;
-import cw.github.pharmakon.Model_Local.GitAnalysis;
-import cw.github.pharmakon.Model_Local.GitWrap;
+import cw.github.pharmakon.ModelLocal.Credential;
+import cw.github.pharmakon.ModelLocal.CredentialReport;
+import cw.github.pharmakon.ModelLocal.Failure;
+import cw.github.pharmakon.ModelLocal.GitAnalysis;
+import cw.github.pharmakon.ModelLocal.GitWrap;
 
 /**
  * @author camille.walim
  	Parameters :
  		server= 	String
  		user = 		String 
-    	password = 	String
+    	password = 	String 
+    	oauth_server = 	String
 		mode = 		offline or [java]-[size_min]-[number_of_pages]
-		doEmail=	boolean 
 		doConnect=	boolean
+		doNameAndShame=	boolean 
 	Example :
 		https://github.com/
 		camillewalim
@@ -43,26 +45,29 @@ public class Application implements CommandLineRunner {
     @Override
     public void run(String... args) throws Exception {
     	
-		String 	server= args[0], user = args[1], password = args[2], mode = args[3]; 
-		Boolean doEmail=Boolean.valueOf(args[4]), doConnect=Boolean.valueOf(args[5]);
+		String 	git_server= args[0], git_user = args[1], git_password = args[2], 
+				mode = args[3],
+				oauth_server = args[4]; 
+		Boolean doNameAndShame=Boolean.valueOf(args[5]), doConnect=Boolean.valueOf(args[6]);
 
 		File folder = new File(System.getProperty("user.home") + File.separator + ".github-pharmakon");
 		if(! folder.exists()) folder.mkdir();
 		
-		GitAnalysis analysis = new DoDetect(server, folder)
+		GitAnalysis analysis = new DoDetect(git_server, oauth_server, folder)
 			.detect(
 			mode.equals("offline") ?
 					new DoLoadOffline().load(folder)
-				:	new DoLoadOnline(server, user, password, folder).load(
+				:	new DoLoadOnline(git_server, git_user, git_password, folder).load(
 					mode.split("-")[0], 
 					Integer.valueOf(mode.split("-")[1]), 
 					Integer.valueOf(mode.split("-")[2])));
 		
-		new DoAction(doEmail,doConnect).doAction(analysis);
+		new DoAction(doNameAndShame, doConnect).doAction(analysis);
 
 		util_save_csv(folder, "gits", 			analysis.gits,			GitWrap.headers);
-		util_save_csv(folder, "credentials", 	analysis.credentials,	Credential.headers);
 		util_save_csv(folder, "failures", 		analysis.failures,		Failure.headers);
+		util_save_csv(folder, "credentials", 	analysis.credentials,	Credential.headers);
+		util_save_csv(folder, "reports", 		analysis.reports,		CredentialReport.headers);
 		
 		System.exit(0);
     }

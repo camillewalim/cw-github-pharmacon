@@ -1,11 +1,17 @@
 package cw.github.pharmakon;
 
+import static cw.github.pharmakon.ModelPattern.falsepositives_hints;
+import static cw.github.pharmakon.ModelPattern.falsepositives_syntax;
+import static cw.github.pharmakon.ModelPattern.positives;
+import static cw.github.pharmakon.ModelPattern.sequence_all;
+
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.PrintWriter;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -13,8 +19,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BiConsumer;
+import java.util.function.UnaryOperator;
 import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
@@ -36,14 +43,18 @@ import org.eclipse.jgit.treewalk.filter.PathSuffixFilter;
 import org.eclipse.jgit.util.io.NullOutputStream;
 
 import com.google.common.collect.HashMultimap;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Multimap;
 
-import cw.github.pharmakon.Model_Local.Credential;
-import cw.github.pharmakon.Model_Local.Failure;
-import cw.github.pharmakon.Model_Local.GitAnalysis;
-import cw.github.pharmakon.Model_Local.GitWrap;
+import cw.github.pharmakon.ModelLocal.Credential;
+import cw.github.pharmakon.ModelLocal.Failure;
+import cw.github.pharmakon.ModelLocal.GitAnalysis;
+import cw.github.pharmakon.ModelLocal.GitWrap;
+import cw.github.pharmakon.ModelLocal.Hint;
+import cw.github.pharmakon.ModelPattern.Sequence_Human;
+import cw.github.pharmakon.ModelPattern.Sequence_Oauth;
+import cw.github.pharmakon.ModelPattern.Target;
 import lombok.AllArgsConstructor;
-import lombok.Getter;
 
 /**
  * @author camille.walim
@@ -52,73 +63,50 @@ import lombok.Getter;
 @AllArgsConstructor
 public class DoDetect {
 	
-	static final String[] hints = {
-		"pass","user","jdbc",
-		"key", "Key",
-		"clientId", "clientSecret"
-		//,"url"
-		};
-	
-	static final Pattern positives = Pattern.compile("("
-		+ Stream.of(hints).collect(Collectors.joining("|"))
-		+ ")"
-		+ "\"?"
-		+ "\s*"
-		+ "[:|=]"
-		+ "(.*[,|\n|;])");
-	
-	static final Pattern falsepositives_hints = Pattern.compile("("
-		+ "passthrough"
-		+ ")");
-	
-	static final String endline = "\\s*\\n?";
-	static final Pattern falsepositives_syntax = Pattern.compile("("
-		+ Stream.of(
-			"\\w*" + "[:|=]" + "\\s*" + "[\\$|#]" + ".*" + endline,
-			".*" + "\\(?" + "\\)" + "[;|,]" + endline,
-			"(.*" + Stream.of("'", "\\)", "\\]", "\\)", "\\{").collect(Collectors.joining("\\s*")) + endline +")"
-			).collect(Collectors.joining("|"))
-		+ ")"); 
-	
-	
-	enum Sequence_JDBC{
-		jdbc, username, password
-	}
-	enum Sequence_Oauth{
-		clientId, clientSecret
-	}
-	enum Sequence_JKS{
-		keystorePassword, keystoreName
-	}
-	
-	
-	
-	
-	
-	String server;
+	String gitserver, oauthserver;
 	File folder;
 	
 	
-	public GitAnalysis detect(List<GitWrap> gits) throws Exception {
+	public GitAnalysis detect(List<GitWrap> gits) {
 		
-		HashMap<Credential, Credential> credentials = new HashMap<>();
-		List<Failure> failures= new ArrayList<>();
+		List<Failure> failures = new ArrayList<>();
+		List<Credential> credentials = new ArrayList<>();
 		
-		for(GitWrap git : gits) {
-			get_report(git);
-			Map<String,Multimap<String,Hint>> hints = get_hints(git);
+		gits.parallelStream()
+			.forEach(git  -> { try {
+				
+				get_report(git);
+				Map<String,Multimap<String,Hint>> hints = get_hints(git);
 
-			String repo_name = Optional
-				.of(git.getGit().getRepository().getDirectory())
-				.map(r -> r.getParentFile().getParentFile().getName() + "/" + r.getParentFile().getName())
-				.get();	
-			
-			get_failures(git, repo_name, hints, credentials, failures);
-			
-			util_save_txt(repo_name, hints);
-		}
+				String repo_name = Optional
+					.of(git.getGit().getRepository().getDirectory())
+					.map(r -> r.getParentFile().getParentFile().getName() + "/" + r.getParentFile().getName())
+					.get();	
+				
+				List<Failure> temp_failures = get_failures(git, repo_name, hints);
+				
+				failures.addAll(temp_failures);
+				credentials.addAll(get_credentials(git, failures));
+				
+				util_save_txt(repo_name, hints);
+				
+			}catch(Exception e) {
+				throw new RuntimeException(e);
+			}});
 		
-		return new GitAnalysis(gits, credentials.keySet(),failures);
+		HashMap<String,Credential> distinct_credentials = new HashMap<>();
+		
+		credentials	.stream()
+					.forEach(credential -> {
+						String key =	credential.getType()[0].getClass().getSimpleName() 
+								+":"+ 	credential.getUsername()
+								+":"+ 	credential.getPassword();
+						Optional<Credential> find = Optional.ofNullable(distinct_credentials.get(key));
+							find.ifPresent(find_credential -> find_credential.merge(credential));
+							if(! find.isPresent()) distinct_credentials.put(key, credential);
+					});
+				
+		return new GitAnalysis(gits, distinct_credentials.values(), failures, new ArrayList<>());
 		
 	}
 	
@@ -145,7 +133,9 @@ public class DoDetect {
 					df.setReader(reader, cf);
 					df.format(diff);
 					String msg = new String(bos.toByteArray(), StandardCharsets.UTF_8);
+					
 					Matcher m = positives.matcher(msg);
+					
 					while(m.find()) {
 						String hint = m.group();
 						if(		! falsepositives_syntax.matcher(hint).matches()
@@ -158,7 +148,7 @@ public class DoDetect {
 										return leaking_commits;
 									})
 									.put(	diff.getOldId().name() + " > " + diff.getNewId().name(), 
-											new Hint(commit, diff, m.end(), hint.trim()	));
+											new Hint(git, commit, diff, m.end(), hint.trim()	));
 						}
 					}
 				}
@@ -170,74 +160,123 @@ public class DoDetect {
 	}
 	
 	List<Failure> get_failures(
-		GitWrap git, String repo_name, Map<String,Multimap<String,Hint>> hints, 
-		HashMap<Credential, Credential> credentials, List<Failure> failures) throws Exception{
+		GitWrap git, String repo_name, 
+		Map<String,Multimap<String,Hint>> hints) throws Exception{
 		
-		hints.forEach((file, commits) -> {
-			
-			AtomicReference<Object> currentStatus = new AtomicReference<>();
-			AtomicReference<List<String>> currentSequence = new AtomicReference<>();
-			
-			Runnable resetSequence = () -> currentSequence.set(new ArrayList<>());
-			
-			commits	.asMap().entrySet().stream()
+		return hints
+			.entrySet().parallelStream()
+			.flatMap(file -> {
+				
+				AtomicReference<Object> currentStatus = new AtomicReference<>();
+				AtomicReference<List<String>> currentSequence = new AtomicReference<>();
+				
+				Runnable resetSequence = () -> currentSequence.set(new ArrayList<>());
+				
+				return file	
+					.getValue().asMap().entrySet().stream()
 					.sorted(Comparator.comparing(e -> e.getKey()))
-					.forEach(commit -> {
+					.flatMap(commit -> {
+						
 						resetSequence.run();
+						
+						return
 						commit	.getValue().stream()
 								.sorted(Comparator.comparing(hint -> hint.getText().length() < 150))
-								.forEach(hint -> {
-									decode : for(Enum<?>[] sequence :
-										Stream.<Enum<?>[]>of(
-											Sequence_JDBC.values(),
-											Sequence_Oauth.values(),
-											Sequence_JKS.values()) 
-										.collect(Collectors.toList())){
-										for(int index = 0; index  < sequence.length ; index++ ) {
-											
-											if(hint.getText().contains(sequence[index].name())) {
-												if(index==0)	
-													resetSequence.run();
+								.flatMap(hint -> {
+									
+									List<Failure> failures = new ArrayList<>();
+									
+									UnaryOperator<String> trim = text -> text 
+										.trim()
+										.substring(Math.max(hint.getText().indexOf("="), 
+															hint.getText().indexOf(":"))+1);
+									
+									BiConsumer<Target[],List<String>> add_sequence= (type,sequence) -> {
+										failures.add(new Failure(null, hint,
+											type,
+											sequence,
+											Stream	.of(gitserver,repo_name,"blob",hint.getCommit().getId().name(),file.getKey())
+													.collect(Collectors.joining("/"))	));
+									};
+									
+									
+									decode : for(Target[] sequence : sequence_all){
+											for(int index = 0; index  < sequence.length ; index++ ) {
 												
-												if(index==0 || currentStatus.get()==sequence[index-1]) {
-													while(currentSequence.get().size()<index)
-														currentSequence.get().add("");
-													currentSequence.get().add(hint.getText()
-														.trim()
-														.substring(Math.max(hint.getText().indexOf("="), 
-																			hint.getText().indexOf(":"))+1));
-												}
+												if(hint.getText().contains(sequence[index].name())) {
+													if(index==0)	
+														resetSequence.run();
 													
-												
-												if(index == sequence.length-1) {
-													Credential credential = new Credential (
-														git, UUID.randomUUID(), 
-														currentSequence.get());
-													Optional.ofNullable(credentials.get(credential))
-															.orElseGet(()->{
-																credentials.put(credential,credential);
-																return credential;
-															});
-													failures.add(new Failure(
-														credential,
-														Stream	.of(server,repo_name,"blob",hint.getCommit().getId().name(),file)
-																.collect(Collectors.joining("/"))	));
+													if(index==0 || currentStatus.get()==sequence[index-1]) {
+														while(currentSequence.get().size()<index)
+															currentSequence.get().add("");
+														currentSequence.get().add(trim.apply(hint.getText()));
+													}
+													
+													if(index == sequence.length-1) 
+														add_sequence.accept(sequence,currentSequence.get());
+													
+													currentStatus.set(sequence[index]);
+													break decode;
 												}
 												
-												currentStatus.set(sequence[index]);
-												break decode;
 											}
-											
 										}
-									}
+									return failures.stream();
 								});
-					});
-			
-		});
-		return failures;
+						});
+				})
+			.collect(Collectors.toList());
 	}
 	
-	TreeWalk tree_find(Git git, String regex) throws Exception {
+	List<Credential> get_credentials(GitWrap git, List<Failure> failures ){
+		
+		Map<String,String> template = ImmutableMap.of(
+			Sequence_Oauth.class.getSimpleName(), oauthserver
+		);
+		
+		ArrayList<Credential> credentials = new ArrayList<>();
+		
+		failures.stream()
+				.peek(failure -> failure.getType()[0].shift(failure, template))
+				.forEach(failure -> {
+					Optional<Credential> find = credentials.stream()
+						.filter(c ->	(c.getType()==failure.getType()	|| c.getType()[0] instanceof Sequence_Human || failure.getType()[0] instanceof Sequence_Human)  
+								&&		(c.getUsername().isEmpty() || c.getUsername().equals(failure.getSequence().get(1)))
+								&&		(c.getPassword().isEmpty() || c.getPassword().equals(failure.getSequence().get(2)))	)
+						.findAny();
+					find.ifPresent(c -> c.merge(failure));
+					if(! find.isPresent())
+						credentials.add(new Credential(
+							UUID.randomUUID(), 
+							failure.type, 
+							failure.getSequence().get(1), 
+							failure.getSequence().get(2), 
+							Stream	.of(failure.getSequence().get(0))
+									.collect(Collectors.toSet()),
+							Arrays.asList(failure)));
+				});
+		
+		return credentials;
+	}
+	
+	void util_save_txt(String repo_name, Map<String,Multimap<String,Hint>> hints) throws Exception {
+		try(PrintWriter p = new PrintWriter(new FileWriter(folder.getAbsoluteFile()+File.separator + "logs_" + repo_name.replace("/", "_") + ".log")) ;){
+			hints.forEach((file, failures)->{
+				p.println(file);
+				failures.asMap().entrySet().stream()
+						.sorted(Comparator.comparing(e -> e.getKey()))
+						.forEach(commit ->{
+							p.println("   " + commit.getKey());
+							commit	.getValue().stream()
+									.sorted(Comparator.comparing(hint -> hint.getLocation()))
+									.forEach(hint -> p.println("      " + hint.getText()));
+						});
+			});
+		}
+	}
+
+	static TreeWalk tree_find(Git git, String regex) throws Exception {
 		
 		Repository repo= git.getRepository();
         ObjectId lastCommitId = repo.resolve(Constants.HEAD);
@@ -258,14 +297,30 @@ public class DoDetect {
         }	
         return objectId;
 	}
+
 	
-	int tree_count(TreeWalk t) throws Exception {
+	static ObjectId tree_get_in(Git git, RevCommit commit, String regex) throws Exception {
+
+		Repository repo= git.getRepository();
+		
+		// and using commit's tree find the path
+		RevTree tree = commit.getTree();
+		try(TreeWalk treeWalk = new TreeWalk(repo)){
+			treeWalk.addTree(tree);
+			treeWalk.setRecursive(true);
+			treeWalk.setFilter(PathSuffixFilter.create(regex));
+			if (!treeWalk.next()) return null;
+			return treeWalk.getObjectId(0);
+		}
+	}
+	
+	static int tree_count(TreeWalk t) throws Exception {
 		int i = 0;
 		while(t.next()) i++;
 		return i;
 	}
 	
-	List<DiffEntry> tree_diff(Git git, Config cf, ObjectId oldTree , ObjectId newTree ) throws Exception{
+	static List<DiffEntry> tree_diff(Git git, Config cf, ObjectId oldTree , ObjectId newTree ) throws Exception{
 		
 		try (
 				ObjectReader reader = git.getRepository().newObjectReader();
@@ -280,30 +335,5 @@ public class DoDetect {
 			return df.scan(oldTreeIter, newTreeIter);
 		}
 	}
-	
-	
-	public void util_save_txt(String repo_name, Map<String,Multimap<String,Hint>> hints) throws Exception {
-		try(PrintWriter p = new PrintWriter(new FileWriter(folder.getAbsoluteFile()+File.separator + "logs_" + repo_name.replace("/", "_") + ".log")) ;){
-			hints.forEach((file, failures)->{
-				p.println(file);
-				failures.asMap().entrySet().stream()
-						.sorted(Comparator.comparing(e -> e.getKey()))
-						.forEach(commit ->{
-							p.println("   " + commit.getKey());
-							commit	.getValue().stream()
-									.sorted(Comparator.comparing(hint -> hint.getLocation()))
-									.forEach(hint -> p.println("      " + hint.getText()));
-						});
-			});
-		}
-	}
 
-
-	@AllArgsConstructor @Getter 
-	static class Hint{
-		RevCommit commit;
-		DiffEntry diff;
-		int location;
-		String text;
-	}
 }
