@@ -16,14 +16,14 @@ import lombok.Setter;
 
 
 
-public class Model {
+public class Model_Native {
 
 	@JsonInclude(JsonInclude.Include.NON_NULL)
 	@Getter
 	@Setter
 	@NoArgsConstructor
 	public static class Owner implements Serializable {
-
+		private static final long serialVersionUID = 1L;
 		@JsonProperty("login")
 		private String login;
 		@JsonProperty("id")
@@ -69,6 +69,7 @@ public class Model {
 	@Setter
 	@NoArgsConstructor
 	public static class Permissions implements Serializable {
+		private static final long serialVersionUID = 1L;
 
 		@JsonProperty("admin")
 		private Boolean admin;
@@ -86,6 +87,8 @@ public class Model {
 	@Setter
 	@NoArgsConstructor
 	public static class License implements Serializable {
+
+		private static final long serialVersionUID = 1L;
 
 		@JsonProperty("key")
 		private String key;
@@ -109,12 +112,14 @@ public class Model {
 	@AllArgsConstructor
 	public static class Repositories implements Serializable {
 
+		private static final long serialVersionUID = 1L;
+
 		@JsonProperty("total_count")
 		private Integer totalCount;
 		@JsonProperty("incomplete_results")
 		private Boolean incompleteResults;
 		@JsonProperty("items")
-		private List<Repository> items = null;
+		private List<RepositoryMetaInfo> items = null;
 		@JsonIgnore
 		private Map<String, Object> additionalProperties = new HashMap<String, Object>();
 
@@ -124,7 +129,8 @@ public class Model {
 	@Getter
 	@Setter
 	@NoArgsConstructor
-	public static class Repository implements Serializable {
+	public static class RepositoryMetaInfo implements Serializable {
+		private static final long serialVersionUID = 1L;
 
 		@JsonProperty("id")
 		private Integer id;

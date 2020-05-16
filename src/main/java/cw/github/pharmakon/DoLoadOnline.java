@@ -20,30 +20,31 @@ import org.springframework.web.client.RestTemplate;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 
-import cw.github.pharmakon.Model.Repositories;
-import cw.github.pharmakon.Model.Repository;
+import cw.github.pharmakon.Model_Local.GitWrap;
+import cw.github.pharmakon.Model_Local.GitComputedInfo;
+import cw.github.pharmakon.Model_Native.Repositories;
+import cw.github.pharmakon.Model_Native.RepositoryMetaInfo;
 import lombok.AllArgsConstructor;
-import lombok.Getter;
 
+/**
+ * @author camille.walim
+ * Let you load metadata from github, store it, then clone all the gits
+ */
 @AllArgsConstructor
-public class Search {
+public class DoLoadOnline {
 	
 	static String
-	url = "https://api.github.com/search/repositories",
+	url = "/search/repositories",
 	sort = "forks", order="desc";
-	static int per_page=100;
+	static int per_page=20;
 	
-	String user, password;
+	String server, user, password;
 	File save;
 	
-	public List<GitAndRepo> search(String language, int size, int pageLimit) throws Exception {
+	public List<GitWrap> load(String language, int size, int pageLimit) throws Exception {
 		return 
 			save_repo_ssi(
-				save_repo_meta( language,  size,  pageLimit).getItems()
-				.stream().filter(g -> 
-				g.getName().contains("okhttp")
-				).collect(Collectors.toList())
-				);
+				save_repo_meta( language,  size,  pageLimit).getItems());
 	}
 	
 	
@@ -68,7 +69,7 @@ public class Search {
 			repos = 
 			IntStream.range(0,pageLimit)
 				.mapToObj(i -> rest
-						.getForEntity(url
+						.getForEntity(server + url
 							+ "?q={q}&sort={sort}&order={order}&page={page}&per_page={per_page}"
 							, Repositories.class, ImmutableMap.of(
 							"q",		"language:"+language+"+size:>="+size,
@@ -80,7 +81,7 @@ public class Search {
 				.reduce((r0,r1)-> new Repositories(
 					r0.getTotalCount(), 
 					false, 
-					ImmutableList.<Repository>builder()
+					ImmutableList.<RepositoryMetaInfo>builder()
 						.addAll(r0.getItems())
 						.addAll(r1.getItems())
 						.build(), 
@@ -97,33 +98,32 @@ public class Search {
 	}
 	
 	
-	List<GitAndRepo> save_repo_ssi(List<Repository> repos) throws Exception {
-		List<GitAndRepo> list = new ArrayList<>();
+	List<GitWrap> save_repo_ssi(List<RepositoryMetaInfo> repos) throws Exception {
+		List<GitWrap> list = new ArrayList<>();
 		
-		for(Repository r : repos){
-			File local = new File(save.getAbsolutePath() + File.separator + r.getFullName().replace("/", "_") + File.separator + ".git");
+		for(RepositoryMetaInfo repo : repos){
+			File local = new File(save.getAbsolutePath() + File.separator + repo.getFullName());
 			if(! local.exists()) {
 				local.mkdir();
+				System.out.println("cloning : " + repo.getCloneUrl());
 				list.add(
-					new GitAndRepo(
-					Git
-						.cloneRepository()
-				        .setURI(r.getCloneUrl())
-				        .setDirectory(local)
-				        .setCredentialsProvider(new UsernamePasswordCredentialsProvider(user, password))
-				        .call(),
-				    r));	
+					new GitWrap(
+						Git
+							.cloneRepository()
+					        .setURI(repo.getCloneUrl())
+					        .setDirectory(local)
+					        .setCredentialsProvider(new UsernamePasswordCredentialsProvider(user, password))
+					        .call(),
+					    repo,new GitComputedInfo()));	
 			}else {
-				list.add(new GitAndRepo(new Git(new RepositoryBuilder().setGitDir(local).build()),r));
+				list.add(new GitWrap(
+						new Git(new RepositoryBuilder()
+							.setGitDir(new File(local.getAbsolutePath() + File.separator + ".git"))
+							.build()),
+						repo,new GitComputedInfo()));
 			}
 		}
 		
 		return list;
-	}
-
-	@AllArgsConstructor @Getter
-	static class GitAndRepo{
-		Git git;
-		Repository repo;
 	}
 }
