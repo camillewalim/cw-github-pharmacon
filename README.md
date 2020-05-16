@@ -1,3 +1,4 @@
+![](https://raw.githubusercontent.com/camillewalim/cw-github-pharmacon/master/src/main/resources/github-pharmacon.svg)
 # Github Pharmakon
 ## Etymology
 **Pharmakon**: a composite of three meanings: remedy, poison, and scapegoat. 
@@ -30,6 +31,7 @@ The algorithm will :
  - 4: compute the public url accessible through browser for all security failures
  - 5: *(optional)* for any security failure (triple of address, username & credential identified), 
    connect, and if successfully: 
+   
 	   - jdbc : connect & list all databases names.
 	   - api keys : connect & retrieve a valid token out of a oath store.
  - 6: *(optional)* name and shame by sending emails to the owner/team.
