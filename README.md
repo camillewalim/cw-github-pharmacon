@@ -28,16 +28,24 @@ The algorithm will go through six phases :
  - III: use jgit : 
     - to parse the commits tree in reverse order (starting from HEAD)
     - compute diff for all consecutive commits
-    - regex those diff to see if url, username, passwords, secrets, jdbc, etc have been 
-      removed or override and retrieve the original value.
+    - regex those diff to see if sensitive elements have been removed or override and retrieve the original value.
+    
+		- JDBC
+		- Oauth API keys
+		- SSL certificate
+		- Windows logins
+		- Emails
+		- Human-like password (like *HelloWorld123*)
+		- URLs
     - store and index all security failures
     - compute the public url accessible through browser for all security failures
- - IV: *(optional)* for any security failure (triple of address, username & credential identified), 
-   connect, and if successfully: 
+ - IV: *(optional)* for any security failure (triple of address, username & credential identified)
+     - try to connect.
+     - if success, try to measure the riskiness without getting data : 
    
-	   - jdbc : connect & list all databases names, tables, users
-	   - api keys : connect & retrieve a valid token out of a oath store.
-	   - certificate : open it, list aliases and URL.
+		- JDBC : connect & list only databases names, tables, users.
+		- Oauth API keys : connect & retrieve a valid token out of a oauth store.
+		- SSL certificate : open it, list aliases and URLs.
 	   
  - V: *(optional)* name and shame by sending emails to the owner/team.
  - VI: consolidate a report with all credentials found, by owner and repository, as well 
