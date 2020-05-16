@@ -89,9 +89,8 @@ As a developer, you may patch your system by :
  - squashing the git history so it will remove the leaking commits. 
 
 As an administrator, you may patch your system by:
- - activating analysis program (such at this one), or a code compliant sonar (sonarqube, 
-   sonarlint) so they track for potentially leaks 
-   in the server.
+ - activating analysis program (such at this one), github inhouse solution, or a compliancy sonar (sonarqube, 
+   sonarlint) so they track for potentially leaks in the server.
  - putting a hard limits on github public api (the default limit being something like 
    5000 request/hour... ).
 
