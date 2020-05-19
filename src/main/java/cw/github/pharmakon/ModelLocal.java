@@ -37,8 +37,7 @@ public class ModelLocal {
 
 			return util_print(
 
-				cInfo.repo_name,
-				
+				metaInfo==null ? "" : metaInfo.getFullName(),
 				metaInfo==null ? "" : metaInfo.getOwner().getLogin(),
 				metaInfo==null ? -1 : metaInfo.getSize(),
 				metaInfo==null ? -1 : metaInfo.getForksCount(),
@@ -74,7 +73,7 @@ public class ModelLocal {
 		
 		static final String[] headers = {"uuid","url"};
 		public String toString() {
-			return util_print(credential.uuid, url);
+			return util_print(credential==null ? "?" : credential.uuid, url);
 		}
 	}
 
@@ -101,7 +100,7 @@ public class ModelLocal {
 		
 		public void merge(Credential other) {
 			adresses.addAll(other.adresses);
-			failures.forEach(this::detach);
+			other.failures.forEach(this::detach);
 		}
 		
 		public void detach(Failure failure) {
@@ -123,13 +122,13 @@ public class ModelLocal {
 		Credential credential;
 		String adress;
 		boolean isReachable, isValid;
-		String data = "";
+		String risk = "";
 		
-		static final String[] headers = {"uuid","adress","isReachable","isValid","data"};
+		static final String[] headers = {"uuid","adress","isReachable","isValid","risk"};
 		public String toString() {
 			return util_print(
 				credential.uuid,
-				adress,isReachable, isValid, data);
+				adress,isReachable, isValid, risk);
 		}
 	}
 

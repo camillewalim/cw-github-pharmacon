@@ -20,6 +20,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiConsumer;
+import java.util.function.Function;
 import java.util.function.UnaryOperator;
 import java.util.regex.Matcher;
 import java.util.stream.Collectors;
@@ -43,6 +44,7 @@ import org.eclipse.jgit.treewalk.filter.PathSuffixFilter;
 import org.eclipse.jgit.util.io.NullOutputStream;
 
 import com.google.common.collect.HashMultimap;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Multimap;
 
@@ -106,7 +108,10 @@ public class DoDetect {
 							if(! find.isPresent()) distinct_credentials.put(key, credential);
 					});
 				
-		return new GitAnalysis(gits, distinct_credentials.values(), failures, new ArrayList<>());
+		return new GitAnalysis(gits, 
+			distinct_credentials.values(), 
+			failures.stream().filter(f -> f.credential!=null).collect(Collectors.toList()), 
+			new ArrayList<>());
 		
 	}
 	
@@ -186,16 +191,21 @@ public class DoDetect {
 									
 									List<Failure> failures = new ArrayList<>();
 									
-									UnaryOperator<String> trim = text -> text 
-										.trim()
-										.substring(Math.max(hint.getText().indexOf("="), 
-															hint.getText().indexOf(":"))+1);
+									UnaryOperator<String> trim = text -> {
+										try {
+										return text	.trim().replace(" ","")
+													.substring(Math.max(hint.getText().indexOf("="), 
+																		hint.getText().indexOf(":"))+1);
+										}catch(Exception e) {	return "[parsing error]";}
+									};
+										
 									
 									BiConsumer<Target[],List<String>> add_sequence= (type,sequence) -> {
 										failures.add(new Failure(null, hint,
 											type,
 											sequence,
-											Stream	.of(gitserver,repo_name,"blob",hint.getCommit().getId().name(),file.getKey())
+											Stream	.of(gitserver.replace("/api/v3", ""),
+														repo_name,"blob",hint.getCommit().getId().name(),file.getKey())
 													.collect(Collectors.joining("/"))	));
 									};
 									
@@ -211,10 +221,11 @@ public class DoDetect {
 														while(currentSequence.get().size()<index)
 															currentSequence.get().add("");
 														currentSequence.get().add(trim.apply(hint.getText()));
+														
+														if(index == sequence.length-1) 
+															add_sequence.accept(sequence,currentSequence.get());
 													}
 													
-													if(index == sequence.length-1) 
-														add_sequence.accept(sequence,currentSequence.get());
 													
 													currentStatus.set(sequence[index]);
 													break decode;
@@ -235,10 +246,25 @@ public class DoDetect {
 			Sequence_Oauth.class.getSimpleName(), oauthserver
 		);
 		
+		Function<Integer,UnaryOperator<Failure>> split = i -> f -> 
+			Optional.of(f)
+					.map(ff -> new Failure(
+						ff.credential, ff.hint, ff.type, 
+						ImmutableList.of(
+							ff.sequence.get(0).split("\\$")[i],
+							ff.sequence.get(1),
+							ff.sequence.get(2)),
+						ff.url))
+					.get();
+		
+		
 		ArrayList<Credential> credentials = new ArrayList<>();
 		
 		failures.stream()
 				.peek(failure -> failure.getType()[0].shift(failure, template))
+				.flatMap(f -> f.getType()[0] instanceof Sequence_Oauth ?
+						Stream.of(split.apply(0).apply(f), split.apply(1).apply(f))
+					:	Stream.of(f))
 				.forEach(failure -> {
 					Optional<Credential> find = credentials.stream()
 						.filter(c ->	(c.getType()==failure.getType()	|| c.getType()[0] instanceof Sequence_Human || failure.getType()[0] instanceof Sequence_Human)  
@@ -246,15 +272,19 @@ public class DoDetect {
 								&&		(c.getPassword().isEmpty() || c.getPassword().equals(failure.getSequence().get(2)))	)
 						.findAny();
 					find.ifPresent(c -> c.merge(failure));
-					if(! find.isPresent())
-						credentials.add(new Credential(
+					if(! find.isPresent()) {
+						Credential c = new Credential(
 							UUID.randomUUID(), 
 							failure.type, 
 							failure.getSequence().get(1), 
 							failure.getSequence().get(2), 
 							Stream	.of(failure.getSequence().get(0))
 									.collect(Collectors.toSet()),
-							Arrays.asList(failure)));
+							Stream	.of(failure)
+									.collect(Collectors.toList()));
+						failure.credential = c;
+						credentials.add(c);
+					}
 				});
 		
 		return credentials;

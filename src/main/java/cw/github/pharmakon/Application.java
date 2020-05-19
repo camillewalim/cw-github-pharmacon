@@ -67,7 +67,7 @@ public class Application implements CommandLineRunner {
 		util_save_csv(folder, "gits", 			analysis.gits,			GitWrap.headers);
 		util_save_csv(folder, "failures", 		analysis.failures,		Failure.headers);
 		util_save_csv(folder, "credentials", 	analysis.credentials,	Credential.headers);
-		util_save_csv(folder, "reports", 		analysis.reports,		CredentialReport.headers);
+		util_save_csv(folder, "leaks", 		analysis.reports,		CredentialReport.headers);
 		
 		System.exit(0);
     }

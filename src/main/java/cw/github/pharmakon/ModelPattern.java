@@ -122,11 +122,18 @@ public class ModelPattern {
 		};
 	}
 	
-	static final List<Target[]> sequence_all = Arrays.asList(); 
+	static final List<Target[]> sequence_all = Arrays.asList(
+			 Sequence_JDBC.values()
+			,Sequence_Oauth.values()
+			,Sequence_JKS_1.values()
+			,Sequence_JKS_2.values()
+			,Sequence_JKS_3.values()
+		); 
 	
 	static final String[] hints = Stream
 		.concat(
-			Stream.of("pass", "user", "key"),
+//			Stream.of("pass", "user", "key"),
+			Stream.empty(),
 			sequence_all.stream()
 						.flatMap(Stream::of)
 						.filter(e -> e instanceof Key || e instanceof SpecialKey)

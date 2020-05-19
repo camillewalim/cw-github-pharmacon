@@ -32,7 +32,7 @@ public class DoLoadOffline {
 		
 		List<RepositoryMetaInfo> repos = files.get()
     		.filter(File::isFile)
-    		.filter(file -> file.getName().matches("\\w*"))
+    		.filter(file -> file.getName().matches("\\w*-\\d*-\\d*"))
     		.flatMap(file -> {
     			try(
     				ObjectInputStream in = new ObjectInputStream(new FileInputStream(file));){
@@ -56,12 +56,12 @@ public class DoLoadOffline {
     						try {
     							return new GitWrap(
     								new Git(new RepositoryBuilder()
-    											.setGitDir(new File(folder.getAbsolutePath() + File.separator + ".git"))
+    											.setGitDir(new File(folder.getAbsolutePath() + File.separator + f +  File.separator + ".git"))
     											.build()), 
     								repos.stream()
-    									.filter(r -> folder.getAbsolutePath().contains(r.getFullName()))
+    									.filter(r -> (folder.getName() +"/" + f).equals(r.getFullName()))
     									.findAny()
-    									.orElseGet(()-> new RepositoryMetaInfo()), 
+    									.orElse(null), 
     								new GitComputedInfo());
     						}catch(Exception e) {
     							throw new RuntimeException(e);
